@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/style.css">
+    <title>🔒Generator Password Personal</title>
+</head>
+
+<body>
+    <h2>🔑Generator Password Personal</h2>
+    <input type="text" id="username" placeholder="Nombre de usuario o servicio">
+    <input type="number" id="length" value="12" min="4" max="64">
+    <button onclick="generatePassword()">Generar</button>
+
+    <p id="result"></p>
+
+    <h2>Historial</h2>
+    <button onclick="loadHistory()">Ver historial</button>
+    <button onclick="clearHistory()" style="background-color: red; color: white;">Borrar historial</button>
+    <ul id="history"></ul>
+
+    <script>
+        async function generatePassword() {
+            const username = document.getElementById("username").value;
+            const length = document.getElementById("length").value;
+            if (!username) {
+                alert("Ingresa Servicio");
+                return;
+            }
+
+            const response = await fetch(`http://127.0.0.1:8000/generate?length=${length}&name=${encodeURIComponent(username)}`);
+            const data = await response.json();
+            document.getElementById("result").textContent = `Contraseña: ${data.password}`;
+        }
+
+        async function loadHistory() {
+            const response = await fetch("http://127.0.0.1:8000/list");
+            const data = await response.json();
+            const historyList = document.getElementById("history");
+            historyList.innerHTML = "";
+            data.forEach(entry => {
+                const li = document.createElement("li");
+                li.textContent = `${entry.name} → ${entry.password}`;
+                historyList.appendChild(li);
+            });
+        }
+    </script>
+
+</body>
+
+</html>

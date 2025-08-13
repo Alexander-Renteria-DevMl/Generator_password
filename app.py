@@ -1,7 +1,12 @@
+# app.py
 import string
 import secrets
 import os
 from cryptography.fernet import Fernet
+from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Query
 
 CLAVE_FILE = "clave.key"
 PASSWORDS_FILE = "contrasenas.enc"
@@ -43,53 +48,52 @@ def guardar_contrasena(nombre, contrasena):
     with open(PASSWORDS_FILE, "ab") as f:
         f.write(data_cifrada + b"\n")
 
-# === Mostrar contraseñas guardadas ===
-def mostrar_contrasenas():
-    if not os.path.exists(PASSWORDS_FILE):
-        print("No hay contraseñas guardadas aún.")
-        return
+# === Backend con FastAPI ===
+app = FastAPI()
 
+# Permitir acceso desde tu HTML local
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Generador de contreaseñas
+
+@app.get("/generate")
+def generate_password(length: int = Query(12), name: str = Query(...)):
+    password = generar_contrasena(length)  # función actual
+    guardar_contrasena(name, password)     # guardar con nombre y pass
+    return {"name": name, "password": password}
+
+
+@app.get("/")
+def home():
+    return HTMLResponse("<h1>API funcionando ✅</h1><p>Usa /generate para generar contraseñas.</p>")
+
+# Historial de contraseñas
+@app.get("/list")
+def list_passwords():
+    if not os.path.exists(PASSWORDS_FILE):
+        return []
+    contrasenas = []
     with open(PASSWORDS_FILE, "rb") as f:
         lineas = f.readlines()
-
-    print("\n--- Contraseñas Guardadas ---")
     for linea in lineas:
         try:
             descifrada = fernet.decrypt(linea.strip()).decode()
             nombre, password = descifrada.split(":")
-            print(f"{nombre} → {password}")
-        except Exception as e:
-            print(f"[ERROR] No se pudo leer una entrada: {e}")
+            contrasenas.append({"name": nombre, "password": password})
+        except Exception:
+            continue
+    return contrasenas
+# Borrar Historial de Contraseñas
+@app.delete("/delete")
+def delete_password():
+    if os.path.exists(PASSWORDS_FILE):
+        os.remove(PASSWORDS_FILE)
+        return{"status":"ok","message":"Historial Eliminado"}
+    return{"status":"ok","message":"Historial Vacio"}
 
-# === Menú principal ===
-if __name__ == "__main__":
-    while True:
-        print("\n=== Gestor de Contraseñas Seguras ===")
-        print("1. Generar nueva contraseña")
-        print("2. Mostrar contraseñas guardadas")
-        print("3. Salir")
-        opcion = input("Seleccione una opción: ")
-
-        if opcion == "1":
-            try:
-                longitud = int(input("Ingrese el tamaño de la contraseña (mínimo 8): "))
-                if longitud < 8:
-                    raise ValueError("La longitud mínima recomendada es de 8 caracteres.")
-
-                nombre = input("Nombre o servicio asociado: ")
-                contrasena = generar_contrasena(longitud)
-                guardar_contrasena(nombre, contrasena)
-                print(f"\nContraseña para '{nombre}': {contrasena} (Guardada de forma segura)")
-
-            except ValueError as e:
-                print("Error:", e)
-
-        elif opcion == "2":
-            mostrar_contrasenas()
-
-        elif opcion == "3":
-            print("Saliendo...")
-            break
-
-        else:
-            print("Opción no válida.")
